@@ -3,7 +3,7 @@ const siteMetadata = {
   title: 'Bryce.Yu\'s Blog',
   author: 'Bryce Yu',
   headerTitle: 'Bryce.Yu\'s Blog',
-  description: 'A blog created with Next.js and Tailwind.css',
+  description: 'This blog is built with Next.js and Tailwind.css',
   language: 'en-us',
   theme: 'system', // system, dark or light
   siteUrl: 'https://earayu.github.io/',
