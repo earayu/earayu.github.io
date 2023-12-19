@@ -1,0 +1,58 @@
+---
+title: Database Vectorization
+date: '2021-10-24'
+tags: ['database', 'vectorization']
+draft: false
+summary: I explore the motivation and techniques behind building a vectorized execution engine for distributed queries. Traditional tuple-at-a-time evaluation fails to utilize hardware efficiently at scale. By expressing queries as linear algebraic operations on batches of column vectors using generated kernels, significant performance gains can be achieved through improved data locality, reduced interpretation overhead and better utilization of CPU resources like SIMD units.
+---
+
+## 背景
+
+Goetz Graefe在1994年发表了著名的Volcano Executor论文，其tuple-at-a-time的pull iterator model设计非常优秀，以至于直到如今，一大批新兴的数据库依然采用那样的执行器架构。在那个年代，磁盘IO、网络带宽、内存、CPU资源都还比较宝贵，所以tuple-at-a-time这样按需取用数据的方式并没有太大的问题。
+但是随着计算机硬件水平的飞速发展，以及更多AP型SQL的引入，在CPU密集型的workload下tuple-at-a-time的模式不够高效。因为仅仅为了获取一行数据，就需要太多的(next)函数调用，既耗时，又不利于CPU的分支预测，也不利于CPU cache。
+
+
+
+## 向量化
+
+Monet/X100的论文在2005年发表，它明确地指出了优化的方向：
+
+- 提高CPU cache利用率；
+- 提高CPU pipeline利用率；
+- 提高CPU SIMD指令利用率；
+- 减少不必要的指令；
+
+为了达成以上的目标，我们把眼光投向了tuple-at-a-time的volcano iterator model。因为过多的函数调用使得CPU难以进行分支预测，所以pipeline利用率很低；同时也难以充分利用CPU cache；动态类型导致需要做额外的类型转换；无法使用SIMD指令；更别说那么多的函数栈开销；
+对于以上问题，处理地比较好的是列存模型。所以，我们可以取一个平衡点：保持volcano iterator model大体架构不变，但是每次都取一批数据（而不是一条）。对于这一批数据，我们可以对其批量处理：生成一个Tight-Loop。循环内部不进行函数调用，将分支减少到最低，避免类型转换，还可以用编译器hint等方式声明SIMD指令的使用。
+于是就引出了一堆关键字：列存数据结构、向量化表达式计算、静态代码生成、表达式编译执行、SIMD指令、延迟物化...
+
+
+
+## 向量化表达式的关键问题
+
+为了减少内存对象的拷贝，通常会使用延迟物化的技术。(业界比较通用的数据结构规范是apache arrow定义的)
+为了避免类型转换，所以表达式的算子需要实现成“强类型”的。（代码生成）
+为了支持批量的列存数据，表达式算子也需要支持列式的数据结构。（代码生成）
+
+当然，向量化表达式计算最好也能够支持一些简单的优化，比如短路求值、懒惰求值
+
+
+
+## 表达式编译
+
+代码生成执行，顾名思义，最核心的部分是生成出我们需要的执行代码。
+拜编译器所赐，我们并不需要写难懂的汇编或字节码。在 native 程序中，通常用 LLVM 的中间语言（IR）作为生成代码的语言。而 JVM 上更简单，因为 Java 编译本身很快，利用运行在 JVM 上的轻量级编译器 janino，我们可以直接生成 Java 代码。
+无论是 LLVM IR 还是 Java 都是静态类型的语言，在生成的代码中再去判断类型显然不是个明智的选择。**通常的做法是在编译之前就确定所有值的类型**。幸运的是，表达式和 SQL 执行计划都可以事先做类型推导。
+所以，综上所述，代码生成往往是个 2-pass 的过程：**先做类型推导，再做真正的代码生成**。第一步中，类型推导的同时其实也是在检查表达式是否合法，因此很多地方也称之为**验证（Validate）**。
+在代码生成完成后，**调用编译器编译**，我们得到了所需的函数（类），调用它即可得到计算结果。
+
+
+
+## 参考资料
+
+- Volcano-An Extensible and Parallel Query Evaluation System
+- MonetDB/X100: Hyper-Pipelining Query Execution
+- https://www.cockroachlabs.com/blog/how-we-built-a-vectorized-execution-engine/
+- https://cs.lmu.edu/~ray/notes/expressionevaluation/
+- https://zhuanlan.zhihu.com/p/337574939
+- https://ericfu.me/code-gen-of-expression/

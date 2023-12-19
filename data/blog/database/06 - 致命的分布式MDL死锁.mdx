@@ -1,0 +1,56 @@
+---
+title: Fatal Distributed MDL Deadlock
+date: '2022-01-28'
+tags: ['database', 'distributed system', 'lock']
+draft: false
+summary: This blog discusses the fatal problem of distributed metadata lock (MDL) deadlocks that can occur when distributed transactions and database definition language (DDL) statements execute concurrently across multiple database nodes. It explains the causes and presents a solution for detecting these distributed MDL deadlocks.
+---
+
+
+
+## 概述
+
+自关系型数据库诞生以来，关系模型演进（schema evolution）就一直是一个重要话题。在SQL-92标准中提出了一系列用于修改关系模型的语法，也就是各种DDL语句。DDL发展到今天，理论已经相对比较成熟了，但受限于各个数据库的历史包袱，大部分问题其实都是工程问题。今天讨论的就是其中之一：分布式MDL锁的死锁问题。
+
+## 问题背景
+
+> 本文涉及的问题是普适的，但为了便于案例展示，将会使用MySQL>=5.7的版本进行说明。
+
+关系型数据库一般都要提供ACID的保证，这就意味着DDL的执行不能干扰到其他事务的ACID特性。当DDL和其他读写事务并发执行时，很显然DDL引发的元数据变更会造成事务的原子性、一致性、持久性出现问题。所以，在MySQL的早期版本中，DDL执行时，读写事务都是被严格限制的。这种情况一直持续到MySQL引入了MDL锁和Online DDL能力后，才有所改善。
+简单来说：
+
+1. 读写事务会获取元数据的读锁（后称：MDL的S锁），DDL会获取元数据的写锁（后称：MDL的X锁）。
+2. MySQL的Online DDL会将一条DDL语句分成很多个阶段，只有在必要的阶段（通常时间会压缩地很短）才会获取MDL的X锁。所以，在DDL的大部分阶段，读写事务都是可以执行的，只有在那些必要的阶段，DDL才会阻塞读写事务。
+3. 为了保证读写事务不会对DDL形成活锁，MDL一般都会被设计成一个“公平锁”。
+
+即便MySQL有了Online DDL，大家还是只敢在半夜进行DDL操作。其中一个重要原因就在于MDL锁的“公平性”。当DDL在等待一个长事务时，它将阻塞后续所有的读写事务，极有可能造成业务的中断，并且MySQL获取MDL锁的超时时间默认长达一年，是一件非常危险的事情。从锁的视角来看：MDL请求队列中的X锁，阻塞了后续S锁的申请，大家都在排队等待最前面的MDL锁释放。换句话说，MDL请求队列中的X锁，会将它之前的所有S锁升级成X锁。
+
+## 分布式MDL死锁的形成
+
+对于只涉及DML和DQL的事务，有可能出现“单机事务死锁”和“分布式事务的死锁”。前者MySQL提供死锁检测能力，后者即便不进行处理，事务也会在一定时间后超时，默认50s。取决于MySQL的innodb\_lock\_wait\_timeout参数。<br />
+类似的，DDL也会出现死锁，并且MySQL也只提供了“单机的MDL死锁检测能力”。然而，当XA事务和DDL结合起来之后，可能会出现“分布式MDL死锁”的问题。<br />
+分布式MDL死锁的危害巨大，因为它不仅会阻塞当前事务和DDL，还会阻塞后续所有事务，默认超时时间是1年。要排查起来也十分麻烦，需要到多个MySQL节点拉取MDL锁信息。<br />
+总结起来“分布式MDL死锁”的问题：范围大、时间久、排查难。一旦出现，可能导致流量长时间跌0的危险情况。<br />
+以下是形成“分布式MDL死锁”的SQL流程。跟普通的数据死锁不同，MDL死锁实际上只有一方持有了锁，但是造成了多方都在互相等待对方资源的事实，也就形成了事实上的死锁。
+
+![image.png](/assets/pc228m/1612369023134-528a4456-0354-40b5-a793-2a94d5548f12.png)
+
+
+
+## 解决方案
+
+跟任意一个“分布式死锁检测方案”一样，我们可以通过构造有向图，然后检测环路的方式来检测是否发生了死锁。一旦发生，则选择其中的一个线程kill掉即可。具体实施过程如下：<br />
+
+1. 从所有MySQL节点收集事务信息，将同一个XA事务中多个RM的事务信息合并在一起。形成有向图中的一个节点，比如下图中的XA1、XA2。<br />
+2. 同时，也构建出所有事务之间的wait-for关系。（可以通过performance\_schema.data\_lock\_waits表获得）<br />
+3. 从所有MySQL节点收集MDL信息，比如下图中的DDL1、DDL2。<br />
+4. 同时，也构建出所有DDL和事务间的wait-for关系。（可以通过sys.schema\_table\_lock\_waits表获得）<br />
+5. 检测环路。比如下图中XA1->DDL2->XA2->DDL1->XA1形成了环路。<br />
+6. 指定任意策略，kill掉事务或DDL，解开死锁。<br />
+
+![image.png](/assets/pc228m/1612369023134-528a4456-0354-40b5-a793-2a94d5548f14.png)
+
+## 总结
+
+分布式MDL死锁相比于普通的数据死锁，危害巨大并且难以排查。一旦出现，哪怕经验丰富的DBA和开发者都难以短时间内解决问题。本文提出了一种分布式MDL死锁检测的方案，用于解决上述问题。
+在分布式数据库中，如果有MDL的话，死锁检测能力是必备功能之一。当然，现今的关系模型演进（schema evolution）也不是强依赖MDL了，只要能保证DDL和读写事务并发过程中的数据一致性，就能够符合需求。对这一块感兴趣的同学，也欢迎一起探讨。

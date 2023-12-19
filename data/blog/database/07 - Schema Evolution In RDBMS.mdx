@@ -1,0 +1,81 @@
+---
+title: Schema Evolution In RDBMS
+date: '2022-06-12'
+tags: ['database', 'paper reading', 'distributed system', 'DDL']
+draft: false
+summary: Database schema evolution (DDL) poses unique challenges in ensuring concurrency with transactions while maintaining ACID properties. Traditional approaches use metadata locks (MDLs) to serialize DDL and DML/DQL, but this can severely impact performance. This blog discusses the issues and explores solutions like multi-version concurrency control to enable highly concurrent non-blocking schema changes.
+---
+
+
+## 概述
+
+模型演进（schema evolution）是关系型数据库的重要组成部分，在SQL-92标准中提出了一系列用于修改关系模型的语法，也就是各种DDL语句。各个流行的传统数据库都有自己的DDL实现，并且做了相应的优化，但时至今日，数据库的DDL仍然被视为一件危险的事情，只能在运维窗口或者业务低峰期进行。究其原因，在于DDL会阻塞读写事务，对业务会有巨大的潜在影响。 <a name="5Iwh4"></a>
+
+## DDL为什么会阻塞事务
+
+让我先引入2个概念：schema（logical table）、physical layout（physical table）<br />
+schema指的是用户能看到的关系模型，所有的数据都必须与当前chema一致（这里其实就是ACID中的C）。<br />
+physical layout指的是数据如何存储在物理介质上，比如它的数据结构，管理策略等。
+
+很多传统的数据库并没有严格区分这2个概念，所以当这些传统数据库发生schema change的时候，它们不仅需要变更schema，还需要修改physical layout，所有的数据都要按照新的schema修改一遍。
+
+但是，显然不能原地修改physical layout，因为会影响并发的读写事务，并且也难以回滚。所以通常的做法是：按照新的schema创建一个新的physical layout，将数据全部迁移过去（增量/存量），然后用新的schema和新的physical layout替代老的。
+一个显而易见的问题是，有很多数据需要迁移，并且schema change过程中的增量数据也需要小心维护，保证一致性，所以需要相对较长的执行时间。
+并且，哪怕是引入了Online DDL的能力，为了保证一致性，schema change过程中还是需要获取几次MDL锁。而我们知道，MDL锁的影响面通常比用户认知得还要更大。我在[这篇文章](https://www.yuque.com/docs/share/a85d7b5e-cc7d-4d5a-b5b4-377d0402df36?#《致命的分布式MDL死锁》)对其进行过讨论。 <a name="nVAGN"></a>
+
+## DDL也要保证ACID特性
+
+再来看看DDL的其他方面。让我先抛几个问题：DDL是否应该遵循ACID特性？它的ACID特性应该有哪些保证？DDL和DML之间的一致性和隔离型怎么体现？
+
+下面说一下我的观点。
+
+**DDL需要遵守ACID特性**，并且定义如下（非形式性定义）：<br />
+A: DDL要么执行成功，要么执行失败。执行成功则scheme和physical layout全部修改并生效，反之则不然。<br />
+C: 所有的schema和physical layout都应该跟用户提供的最后一次定义保持一致。<br />
+I: DDL之间，执行时不会互相影响。DDL和DML/DQL之间，执行时不会互相影响。<br />
+D: DDL成功后是持久化的，不会丢失数据信息和schema信息。<br />
+
+一些数据库并没有很好地支持DDL的ACID特性，以MySQL为例：MySQL在5.6版本之前都不能保证DDL的原子性，所以有可能DDL执行到一半的时候发生错误，然后看到残留的schema元数据或物理文件。
+
+DDL的隔离性(以及一致性)是一个巨大的问题。<br />
+据我非常有限的所知，没有数据库支持对同一schema并发的DDL，所以**DDL之间如果非要定义一个隔离界别的话，那应该是Serializable。**<br />
+但DDL和DML/DQL之间的隔离型应该是什么？我并不认为是Read Committed，因为同一个事务看到2个不同版本的schema很可能会造成数据不一致。所以应该是Repeatable Read、Snapshot Isolation、或者Serializable。老实说，这3者对DDL和DML/DQL之间的隔离型，区别不是太大。这取决于你希不希望事务能读写一张它begin之后创建的新表。<br />
+**就我而言，Repeatable Read是个不错的选择，即允许事务读写一张它begin之后创建的新表。** <a name="oQF8K"></a>
+
+## DDL如何保证隔离型/一致性
+
+**隔离型和一致性经常是一个硬币的2面；或者说隔离型是因，一致性是果。**
+
+为了保证隔离型/一致性，我们要确保DML/DQL在执行时只能看到一个版本的schema。
+
+传统数据库的方案一般是引入MDL锁，DML/DQL会获取一个schema的共享锁，DDL会获取一个schema的排他锁。但是为了保证不会对DDL形成活锁（饥饿），MDL锁经常被设计成公平锁。但这又引发了一个新的问题，MDL排他锁会阻塞后续的MDL共享锁。所以如果有一个长事务没提交，此时执行一个DDL，后续的所有读写事务都会被阻塞，流量跌0。这也是为什么几遍引入了Online DDL，用户也只敢在运维窗口或业务低峰期执行DDL的核心原因之一。<br />
+当然，也许我们也可以不加锁，而是使用更乐观的方案：DML/DQL在执行前和提交时会检测schema版本，如果不一致则abort。但仔细想象，使用这种方案其实也不能完全避免DDL阻塞DML/DQL，比如在确认存量数据和增量数据分界线的时候，可能还是得短暂地停写一下，所以又回到了MDL锁的路子了。
+
+分布式数据库的方案一般是允许schema存在多个版本（用户依然只能看到最新的版本），DML/DQL会在事务开始的时候确定它要使用的schema version，然后一直使用它。**所以，很重要的一点是，数据库内核需要能够支持多个版本的schema并存时的数据一致性。**Google在论文F1 Online Schema Change中给出了一个非常好的方案：引入多个互相兼容的中间状态，确保这些状态两两并存时数据的一致性；通过lease和write fence保证集群中任何一刻所有的读写事务都不超过2个状态。<br />
+Google的方案非常巧妙，schema多版本使得DDL可以对DML/DQL**几乎**非阻塞地运行。为什么我要加一个“几乎”呢？因为它不允许2个以上版本并存。考虑这个场景：
+
+1. 版本1的长事务正在执行<br />
+2. 版本2是当前最新的版本<br />
+3. 此时版本3该怎么办？<br />
+
+很多数据库的方案是，不允许版本1的长事务执行那么长时间，让它abort。相当于版本3将版本1推下了悬崖。<br />
+当然还有别的方案：版本3阻塞等待版本1提交后，再登上舞台。这种方案看似又回到了MDL锁？其实不然，这边是版本1的DML对版本3的DDL的阻塞，但所有新的读写流量会进入版本2，所以版本3并不会阻塞版本2的读写事务。这样，就既获得了DDL的非阻塞特性、又能支持长事务的执行。 <a name="Zl2Br"></a>
+
+## DDL隔离型/一致性的新探索
+
+在《Non-blocking Lazy Schema Changes in Multi-Version Database Management Systems》这篇论文中提出了MVCC式的schema evolution。它要求多个(大于等于2个)schema版本能够并存，数据会物理性地存储在多个schema版本中，所以避免了schema evolution阻塞读写事务，也不再需要数据的搬迁，所以可以执行地非常快。并且可以连续地进行schema evolution，都会极速成功并返回。但是缺陷是需要处理复杂的数据读写流程，并且后续的读写事务的成本会增加。
+Non-blocking Lazy Schema Changes的方案相比于F1 Online Schema Change来说，不同点在于它允许数据物理性地存储在多个版本的schema中，我认为相比于收益，它的成本更大一些，而F1 Online Schema Change是一个已经被生成环境大规模证明的有效的方案。 <a name="Lr2uh"></a>
+
+## 最后
+
+DDL没有魔法，很多看似神奇的特性只是将成本转移给了DML/DQL。计算机科学就是这样，大部分时候都是在多个设计方案之中获取一个平衡，以达到整体的和谐。<br />
+还有很多没写的东西，比如DDL执行引擎如何设计才能确保原子性，数据分区和迁移的各种做法和爬坑技巧，加入有朝一日系列吧。
+
+<a name="lQIgq"></a>
+
+## Reference
+
+1. [Early History of SQL](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=\&arnumber=6359709)
+2. [Beyond Schema Evolution to Database Reorganization](http://se-pubs.dbs.uni-leipzig.de/files/Lerner1990Beyondschemaevolutionto.pdf)
+3. Non-blocking Lazy Schema Changes in Multi-Version Database Management Systems
+4. [Online, Asynchronous Schema Change in F1](https://static.googleusercontent.com/media/research.google.com/zh-CN//pubs/archive/41376.pdf)
