@@ -3,7 +3,8 @@ title: Should Database DDL Strive for ACID Too? (Award-Winning)
 date: '2022-07-08'
 tags: ['database', 'distributed system', 'DDL']
 draft: false
-summary: Database schema evolution (DDL) poses unique challenges in ensuring concurrency with transactions while maintaining ACID properties. Traditional approaches use metadata locks (MDLs) to serialize DDL and DML/DQL, but this can severely impact performance. This blog discusses the issues and explores solutions like multi-version concurrency control to enable highly concurrent non-blocking schema changes.
+summary: The article discusses the necessity of ACID properties for database DDL operations, challenges in traditional systems, and how PolarDB-X implements transactional DDL, ensuring atomicity, consistency, isolation, and durability to enhance reliability and operational flexibility.
+
 ---
 
 > This article won the first prize in the [Alibaba Cloud Database Pioneer Essay Contest](https://developer.aliyun.com/article/983687).
