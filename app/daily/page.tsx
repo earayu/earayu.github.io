@@ -5,10 +5,10 @@ import { genPageMetadata } from 'app/seo'
 
 const POSTS_PER_PAGE = 10
 
-export const metadata = genPageMetadata({ title: 'Blog' })
+export const metadata = genPageMetadata({ title: 'Daily' })
 
 export default function BlogPage() {
-  const posts = allCoreContent(sortPosts(allBlogs.filter((post) => !post.tags.includes('daily'))))
+  const posts = allCoreContent(sortPosts(allBlogs.filter((post) => post.tags.includes('daily'))))
   const pageNumber = 1
   const initialDisplayPosts = posts.slice(
     POSTS_PER_PAGE * (pageNumber - 1),
