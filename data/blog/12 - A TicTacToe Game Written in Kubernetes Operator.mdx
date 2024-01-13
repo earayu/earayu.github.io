@@ -1,5 +1,5 @@
 ---
-title: A TicTacToe Game Written in Kubernetes Operator (Part 1) (Draft)
+title: A TicTacToe Game Written in Kubernetes Operator (Part 1)
 date: '2024-01-14'
 tags: ['kubernetes', 'operator', 'code for fun']
 draft: true
@@ -56,7 +56,7 @@ After we define our CRD, kubebuilder will generate the code for us. And the proj
 ![image.png](/assets/tictactoe/project.png)
 
 ### Creating a New Controller
-Since we choose YES when asked to whether create a controller, kubebuilder will also generate a controller for us. You can see the generated code in the `internal/controllers/` directory.
+Since we choose YES when asked to whether create a controller, kubebuilder will also generate a controller for us. You can see the generated code in the `internal/controller/` directory.
 As a operator developer, we only need to focus on the business logic of our controller.
 ```go
 func (r *TicTacToeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -68,4 +68,17 @@ func (r *MoveReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 ```
 
+## What does the controller do?
+![image.png](/assets/tictactoe/kubebuilder.png)
+A Controller is a long-running process that continuously monitors the CRD objects that it manages. Let's take TicTacToe and Move CRDs as an example.
+1. It calls the Kubernetes API server to list & watch all the TicTacToe and Move objects. Every time a new TicTacToe or Move object is created, updated, or deleted, the controller will be notified.
+2. It caches the TicTacToe and Move objects in memory.
+3. It calls the Reconcile function to reconcile the TicTacToe and Move objects.
+4. Reconile function will make sure the TicTacToe and Move objects are in the desired state. If not, it will make the necessary changes to the TicTacToe and Move objects.
+5. repeat step 1 to 4.
+
+The step 1 to 3 is done by the Kubebuilder framework. We only need to focus on the step 4.
+In our case, we only need to implement the Reconcile function for TicTacToeReconciler and MoveReconciler objects.
+
+In the next part, we will talk about our TicTacToe Game, and implement the Reconcile function for TicTacToeReconciler and MoveReconciler objects.
 
