@@ -1,0 +1,41 @@
+---
+title: A TicTacToe Game Written in Kubernetes Operator（Draft）
+date: '2024-01-14'
+tags: ['kubernetes', 'operator', 'code for fun']
+draft: true
+summary: I am learning kubernetes, so I write a TicTacToe game based on Kubernetes Operator. This is a sample project to demonstrate how to build a Kubernetes Operator with Kubebuilder.
+---
+
+As a seasoned programmer and a Kubernetes enthusiast, I've been a light user of Kubernetes for about half a year now.
+I'm familiar with the kubectl command line, the declarative APIs, and the architecture that makes Kubernetes such a robust system.
+Whenever people talk about Kubernetes, they can't help but praise its declarative APIs and the Controller Loop.
+It's fascinating when you think about it: you submit a YAML file to Kubernetes, and it orchestrates the desired state effortlessly.
+This sparked my curiosity about the Controller Loop—how does it precisely work?
+To quench this thirst for knowledge, I've embarked on a journey to write a Kubernetes operator, and here's what I've learned.
+
+
+## What is a Kubernetes Operator?
+
+An operator, in the context of Kubernetes, is a method of packaging, deploying, and managing a Kubernetes application.
+A Kubernetes application is both deployed on Kubernetes and managed using the Kubernetes APIs and kubectl tooling.
+The operator takes human operational knowledge and encodes it into software that is more easily shared with consumers to run their applications,
+doing so by extending the Kubernetes API.
+
+## How to Write a Kubernetes Operator in 2024?
+The year 2024 has brought us a plethora of tools to ease the development of Kubernetes operators.
+Among these, I've chosen Kubebuilder as my scaffolding tool because of its simplicity and efficiency.
+Kubebuilder provides us with a powerful framework for building and packaging custom Kubernetes APIs and controllers.
+
+Kubebuilder abstracts away much of the boilerplate code and complexity associated with building Kubernetes operators.
+It allows us to focus on the logic specific to our application—in this case, a TicTacToe game.
+
+## Creating a New API
+To kick things off, we need to create a new API for our game. This is done using the Kubebuilder CLI. We define a new custom resource definition (CRD) for our game with the following commands:
+
+```
+kubebuilder create api --group earayu.github.io --version v1alpha1 --kind TicTacToe
+kubebuilder create api --group earayu.github.io --version v1alpha1 --kind Move
+```
+These commands scaffold out our new TicTacToe and Move kinds, setting up the foundation for us to define the rules and logic of our game. The TicTacToe kind could represent the game board, whereas Move could represent a player's move.
+
+## TODO
