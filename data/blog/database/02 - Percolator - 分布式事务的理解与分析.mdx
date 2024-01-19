@@ -17,6 +17,7 @@ summary: This document analyzes the distributed transaction protocol used in Per
 > 相关背景：
 > 使用MapReduce的话，需要为了一小部分新数据全量计算一遍，很慢且不经济
 > 现存的DBMS无法存储Google的巨量数据
+>
 > BigTable之类的NewSQL可以存储巨量数据，但是缺少跨行事务机制
 > 综上，最简单的方案就是为BigTable增加分布式事务机制。
 >
