@@ -1,0 +1,27 @@
+---
+title: A TicTacToe Game Written in Kubernetes Operator - Part 2
+date: '2024-01-22'
+tags: ['kubernetes', 'operator', 'code for fun']
+draft: true
+summary:
+---
+
+功能
+
+- 锁重入
+- 隐式锁升级
+- 锁owner
+- 读锁，写锁，读比写多
+- 没实现死锁检测（因为没必要）
+- 没实现公平锁（没必要）
+
+
+性能
+
+- 没实现类似于操作系统的futex机制（没必要）
+- 业务场景：低频
+
+使用
+- Batch获取锁
+- Try获取锁的接口
+- 没有实现锁超时（TTL），因为使用场景决定了不需要
