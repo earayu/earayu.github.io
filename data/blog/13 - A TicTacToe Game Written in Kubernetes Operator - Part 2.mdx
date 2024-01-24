@@ -2,6 +2,293 @@
 title: A TicTacToe Game Written in Kubernetes Operator - Part 2
 date: '2024-01-22'
 tags: ['kubernetes', 'operator', 'code for fun']
-draft: true
-summary:
+draft: false
+summary: Detailed explanation of how to write a Kubernetes operator by building a TicTacToe game.
 ---
+
+We will continue to build the TicTacToe game in this article.
+In the previous article, we have created the CRD and the controller.
+In this article, we will add some fields to the CRD and implement the logic of the game.
+
+> The source code of this article is available at [earayu/tictactoe-operator](https://github.com/earayu/kube-kic-tac-toe)
+
+## How to Play The TicTacToe Game
+
+Well, Since we are implementing the TicTacToe game in Kubernetes, we will play the game through YAML files.
+
+*To start a new game, we need to create a `TicTacToe` CR.*
+```yaml
+apiVersion: earayu.github.io.earayu.github.io/v1alpha1
+kind: TicTacToe
+metadata:
+  name: tictactoe-game
+spec:
+```
+
+*To make a move, we need to create a `Move` CR.*
+```yaml showLineNumbers
+apiVersion: earayu.github.io.earayu.github.io/v1alpha1
+kind: Move
+metadata:
+  name: move-1
+spec:
+  ticTacToeName: tictactoe-game
+  row: 1
+  column: 1
+```
+
+*To check the status of the game, we need to get the `TicTacToe` CR.*
+```bash showLineNumbers
+$ kubectl get TicTacToe tictactoe-game -o yaml
+
+apiVersion: earayu.github.io.earayu.github.io/v1alpha1
+kind: TicTacToe
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"earayu.github.io.earayu.github.io/v1alpha1","kind":"TicTacToe","metadata":{"annotations":{},"name":"tictactoe-game","namespace":"default"},"spec":null}
+  creationTimestamp: "2024-01-13T17:02:27Z"
+  generation: 1
+  name: tictactoe-game
+  namespace: default
+  resourceVersion: "909293"
+  uid: abe84d82-a64d-46f1-aa2a-d13fdd4d0edf
+status:
+  chessboard1: ' - | - | - '
+  chessboard2: ' X | O | - '
+  chessboard3: ' - | - | - '
+  move:
+    items:
+    - apiVersion: earayu.github.io.earayu.github.io/v1alpha1
+      kind: Move
+      metadata: {}
+      spec:
+        column: 1
+        player: 1
+        row: 1
+        ticTacToeName: tictactoe-game
+      status:
+        state: Processing
+    - apiVersion: earayu.github.io.earayu.github.io/v1alpha1
+      kind: Move
+      metadata: {}
+      spec:
+        player: 2
+        row: 1
+        ticTacToeName: tictactoe-game
+      status:
+        state: Processing
+    metadata: {}
+  state: playing
+
+```
+
+Did you notice that the `TicTacToe` CR has two related `Move` CRs?
+
+The first one is the move of the human player, created by us in the YAML file.
+And the second one is the move of the bot player, created by the controller.
+
+
+
+## Modify the CRD
+
+So, Let's start to implement the game. <br />
+We will start by adding some fields to the `Move` and `TicTacToe` CRD.
+To do this, we need to modify the `api/v1alpha1/move_types.go` and `api/v1alpha1/tictactoe_types.go` file.
+
+```go {6-11} showLineNumbers
+// MoveSpec defines the desired state of Move
+type MoveSpec struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	TicTacToeName string `json:"ticTacToeName"`
+
+	//+kubebuilder:default=1
+	Player int `json:"player,omitempty"`
+	Row    int `json:"row,omitempty"`
+	Column int `json:"column,omitempty"`
+}
+```
+
+```go {6-16} showLineNumbers
+// TicTacToeStatus defines the observed state of TicTacToe
+type TicTacToeStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+
+	MoveHistory MoveList `json:"move,omitempty"`
+
+	Chessboard1 string `json:"chessboard1,omitempty"`
+	Chessboard2 string `json:"chessboard2,omitempty"`
+	Chessboard3 string `json:"chessboard3,omitempty"`
+
+	// State: playing,draw,humanWins,botWins
+	State string `json:"state,omitempty"`
+
+	// default current time now
+	Version metav1.Time `json:"timestamp,omitempty"`
+}
+```
+
+After modifying the CRD, we need to run `make` to regenerate the code.
+
+```bash showLineNumbers
+make manifests
+make generate
+make install
+```
+
+## Implement the Game Logic
+
+We will implement the game logic in the `internal/controller/move_controller.go` and `internal/controller/tictactoe_controller.go` file.
+
+### The Move Controller
+kubebuilder has already generated the `MoveReconciler` for us. All we need to do is to implement the `Reconcile` function.
+
+The method takes two parameters: `ctx`, a context object for carrying deadlines, cancellations, and other request-scoped values across API boundaries and between processes, and `req`, a `ctrl.Request` object which contains the information of the reconciled object.
+
+```go
+func (r *MoveReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+```
+
+The first part of the method retrieves a `Move` object from the Kubernetes API server using the namespaced name from the request. If the `Move` object is not found, it returns a `reconcile.Result` with no error.
+
+```go
+move := earayugithubiov1alpha1.Move{}
+if err := r.Get(ctx, req.NamespacedName, &move); err != nil {
+  return reconcile.Result{}, client.IgnoreNotFound(err)
+}
+```
+
+Next, it retrieves a `TicTacToe` object using the `TicTacToeName` from the `Move` object. If the `TicTacToe` object is not found, it also returns a `reconcile.Result` with no error.
+
+```go
+ticTacToe := earayugithubiov1alpha1.TicTacToe{}
+if err := r.Get(ctx, namespacedName, &ticTacToe); err != nil {
+  return reconcile.Result{}, client.IgnoreNotFound(err)
+}
+```
+
+The method then sets the `TicTacToe` object as the owner of the `Move` object. If it fails to set the owner reference, it logs the error and returns a `ctrl.Result` with the error.
+
+```go
+if err := controllerutil.SetControllerReference(&ticTacToe, &move, r.Scheme); err != nil {
+  l.Error(err, "unable to set controller reference")
+  return ctrl.Result{}, err
+}
+```
+
+The method then updates the `Move` object in the Kubernetes API server. If it fails to update, it logs the error and returns a `ctrl.Result` with the error.
+
+```go
+if err := r.Update(ctx, &move); err != nil {
+  l.Error(err, "unable to update Move status")
+  return ctrl.Result{}, err
+}
+```
+
+The method then checks the state of the `Move` object. If the state is `Duplicate` or `NotAllowed`, it returns a `reconcile.Result` with no error, effectively ignoring these resources.
+
+```go
+if move.Status.State == earayugithubiov1alpha1.Duplicate || move.Status.State == earayugithubiov1alpha1.NotAllowed {
+  return reconcile.Result{}, nil
+}
+```
+
+Finally, the method validates the row and column specified in the `Move` object. If they are out of bounds, it sets the state of the `Move` object to `NotAllowed`, updates the `Move` object in the Kubernetes API server, and returns a `reconcile.Result` with no error.
+
+```go
+if move.Spec.Row < 0 || move.Spec.Row >= 3 || move.Spec.Column < 0 || move.Spec.Column >= 3 {
+  move.Status.State = earayugithubiov1alpha1.NotAllowed
+  if err := r.Status().Update(ctx, &move); err != nil {
+   l.Error(err, "unable to update Move status")
+   return ctrl.Result{}, err
+  }
+  return reconcile.Result{}, nil
+}
+```
+
+In summary, the `Reconcile` method is responsible for ensuring that the state of the `Move` object in the Kubernetes API server matches the desired state specified by the user. It does this by retrieving the `Move` and `TicTacToe` objects, setting the owner reference, updating the `Move` object, and validating the row and column of the `Move` object.
+
+### The TicTacToe Controller
+Just Like the `MoveReconciler`, kubebuilder has already generated the `TicTacToeReconciler` for us. All we need to do is to implement the `Reconcile` function.
+
+The method begins by retrieving a `TicTacToe` object from the Kubernetes API server using the namespaced name from the request. If the `TicTacToe` object is not found, it returns a `reconcile.Result` with no error.
+
+```go
+var ticTacToe earayugithubiov1alpha1.TicTacToe
+if err := r.Get(ctx, req.NamespacedName, &ticTacToe); err != nil {
+  return reconcile.Result{}, client.IgnoreNotFound(err)
+}
+```
+
+Next, it lists all `Move` objects that have a `.spec.ticTacToeName` field matching the `TicTacToe` object's name. It then filters these moves to only include those that are in the `Processing` state or have an empty state.
+
+```go
+var allMoveList earayugithubiov1alpha1.MoveList
+if err := r.List(ctx, &allMoveList, client.InNamespace(req.Namespace), client.MatchingFields{ticTacToeOwnerKey: req.Name}); err != nil {
+  return reconcile.Result{}, fmt.Errorf("list moves err:%w", err)
+}
+```
+
+The method then sorts the `Move` objects by their creation time and processes each move. It checks if the move is invalid or a duplicate, and updates the move's state accordingly. If an error occurs during this process, it returns a `reconcile.Result` with the error.
+
+```go
+sort.Slice(processingMoves, func(i, j int) bool {
+  return processingMoves[i].CreationTimestamp.Before(&processingMoves[j].CreationTimestamp)
+})
+```
+
+After processing the moves, the method retrieves the current state of the game board and checks for a winner. If a winner is found, it updates the `TicTacToe` object's state to reflect the winner. If the game is finished but there is no winner, it sets the state to "draw". If the game is not finished, it sets the state to "playing".
+
+```go
+winner, finished := portable.CheckWinner(board)
+```
+
+If the game is still in progress, the method checks if it's the bot's turn to make a move. If it is, the bot makes a random move, and the method creates a new `Move` object for the bot's move and adds it to the Kubernetes API server. If an error occurs during this process, it returns a `reconcile.Result` with the error.
+
+```go
+if ticTacToe.Status.State == "playing" {
+  nextPlayer := portable.NextPlayer(&ticTacToe.Status.MoveHistory)
+  if nextPlayer == earayugithubiov1alpha1.Bot {
+   row, col, hasMoved := portable.RandomMove(board)
+   if hasMoved {
+    botMove := &earayugithubiov1alpha1.Move{
+     ObjectMeta: metav1.ObjectMeta{
+      Name:      fmt.Sprintf("%s-bot-move-%d-%d", ticTacToe.Name, row, col),
+      Namespace: ticTacToe.Namespace,
+     },
+     Spec: earayugithubiov1alpha1.MoveSpec{
+      TicTacToeName: ticTacToe.Name,
+      Player:        earayugithubiov1alpha1.Bot,
+      Row:           row,
+      Column:        col,
+     },
+    }
+    controllerutil.SetControllerReference(&ticTacToe, botMove, r.Scheme)
+    err := r.Create(ctx, botMove)
+    if err != nil {
+     return ctrl.Result{}, fmt.Errorf("create move err:%w", err)
+    }
+    return ctrl.Result{Requeue: true}, nil
+   }
+  }
+ }
+```
+
+> TicTacToe Reconcile Method calls some functions from the `portable` package. we will not cover the `portable` package in this article.
+> The source code of the `portable` package is available at [earayu/tictactoe-operator/internal/controller/portable](https://github.com/earayu/kube-kic-tac-toe/tree/main/internal/controller/portable)
+
+## Run/Debug the Operator
+
+The easiest way to run the operator is to use the `make run` command.
+This command will build the operator and run it locally.
+```bash showLineNumbers
+make deploy
+```
+As of Debugging, we can use IDE's debug feature to debug the "cmd/main.go" file. Just like debugging a normal Go program.
+
+As of Now, we can play the game by creating the `TicTacToe` and `Move` CRs. Just like the YAML files we mentioned above.
+
+
