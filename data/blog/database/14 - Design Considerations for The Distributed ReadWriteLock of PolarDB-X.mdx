@@ -11,37 +11,41 @@ When I worked in Alibaba Cloud PolarDB-X team, I tried to design a distributed r
 The lock is used to ensure that only one DDL can be executed at the same time.
 I wasn't realized that there are so many things to consider when designing read-write lock, and I learned a lot from this experience.
 
+> Code can be found [here](https://github.com/polardb/polardbx-sql/blob/a7a1d0d4dac3a9cf8ecfcc52f2c8ef126e187ca4/polardbx-gms/src/main/java/com/alibaba/polardbx/gms/metadb/misc/PersistentReadWriteLock.java#L55)
+
 # Background
 
-Polardb-X is a distributed database, which is based on MySQL. It has a distributed DDL execution engine, which is used to execute DDLs in a distributed way.
-For any DDL, it will be scheduled on the leader node, and then the leader node will execute it by itself or send it to other nodes to execute.
-The DDL can be paused and resumed, and it can be executed in parallel with other DDLs.
+PolarDB-X is a distributed database inspired by MySQL. It features a distributed DDL execution engine to handle DDL operations across its nodes.
+These operations are managed by a leader node, which either executes them directly or delegates them to other nodes.
+DDL operations can be paused, resumed, and run in parallel, necessitating a robust distributed lock system to prevent simultaneous modifications on the same table.
 
-To prevent two DDLs of the same table from being executed at the same time, we need a distributed lock.
+
 
 # Functionality Considerations
 
-I soon realized that I need a distributed read-write lock.
+All DDLs in Polardb-X are executed asynchronously, and can be paused and resumed. Users can track the status of a DDL using a JobId.
+It means, Unlike MySQL, DDLs' lifecycle is not bounded with a single connection, it's bounded with a JobId.
+So the lock should be persistent, and it should be released when the DDL is finished. Since Polardb-X is a distributed database, the lock should be distributed.
+I realized that I need a Linearizable storage to implement the lock. But I didn't want to introduce a new dependency, so I used Polardb-X itself as the storage.
 
-功能
 
-- 锁重入
-- 隐式锁升级
-- 锁owner
-- 读锁，写锁，读比写多
-- 没实现死锁检测（因为没必要）
-- 没实现公平锁（没必要）
+The lock should serve read and write operations, and read operations are more frequent than write operations. So obviously, I need a read-write lock.
+I love reentrant locks, because they are easy to use. Impicit lock upgrade is also a good feature, so I decided to support them too.
 
-# Performance Considerations
-
-性能
-
-- 没实现类似于操作系统的futex机制（没必要）
-- 业务场景：低频
+Since the lock is used only for DDLs, it's not necessary to implement lock fairness.
 
 # API Interface Considerations
 
-使用
-- Batch获取锁
-- Try获取锁的接口
-- 没有实现锁超时（TTL），因为使用场景决定了不需要
+Polardb-X will generate a plan for each DDL before executing it. The plan contains all the locks that the DDL needs to acquire.
+So I decided not to implement deadlock detection, instead, I implemented a batch tryLock interface, which can try to acquire all the locks after the plan is generated.
+It's more efficient than try to acquire each lock one by one, and it also can avoid deadlock.
+
+The lock should be released when the DDL is finished, so I didn't implement lock timeout.
+
+# Performance Considerations
+
+When multiple locks are needed for a DDL, the system attempts to acquire them all at once.
+A failure to do so leads to a retry, reminiscent of a spin lock, which is not the most resource-efficient.
+I considered a futex-like solution that would allow a thread to sleep upon failure and wake once the lock becomes available.
+
+However, my aim was to keep the system simple, so I chose not to implement this mechanism despite its potential to enhance performance.
