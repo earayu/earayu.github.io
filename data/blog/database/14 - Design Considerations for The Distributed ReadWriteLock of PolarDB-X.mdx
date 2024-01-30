@@ -6,6 +6,23 @@ draft: true
 summary:
 ---
 
+# Introduction
+When I worked in Alibaba Cloud PolarDB-X team, I tried to design a distributed read-write lock for its DDL execution engine.
+The lock is used to ensure that only one DDL can be executed at the same time.
+I wasn't realized that there are so many things to consider when designing read-write lock, and I learned a lot from this experience.
+
+# Background
+
+Polardb-X is a distributed database, which is based on MySQL. It has a distributed DDL execution engine, which is used to execute DDLs in a distributed way.
+For any DDL, it will be scheduled on the leader node, and then the leader node will execute it by itself or send it to other nodes to execute.
+The DDL can be paused and resumed, and it can be executed in parallel with other DDLs.
+
+To prevent two DDLs of the same table from being executed at the same time, we need a distributed lock.
+
+# Functionality Considerations
+
+I soon realized that I need a distributed read-write lock.
+
 功能
 
 - 锁重入
@@ -15,11 +32,14 @@ summary:
 - 没实现死锁检测（因为没必要）
 - 没实现公平锁（没必要）
 
+# Performance Considerations
 
 性能
 
 - 没实现类似于操作系统的futex机制（没必要）
 - 业务场景：低频
+
+# API Interface Considerations
 
 使用
 - Batch获取锁
