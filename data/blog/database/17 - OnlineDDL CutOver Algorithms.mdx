@@ -1,0 +1,51 @@
+---
+title: OnlineDDL CutOver Algorithms
+date: '2024-03-10'
+tags: ['database', 'OnlineDDL']
+draft: true
+summary:
+---
+
+Online DDL typically can be divided into three key steps: copying of existing data, copying of incremental data, and CutOver.
+
+CutOver is usually the final step, which involves swapping the **target table** (also known as the shadow table) with the
+**source table** (also known as the main or original table), acting as the commit point of the Online DDL.
+
+There is some design space around CutOver, and different design trade-offs will reflect different behaviors to the application side.
+This article mainly discusses the specific implementations of CutOver by various Online DDL tools.
+
+## pt-online-schema-change
+
+The cutover process of pt-online-schema-change (pt-osc) is the simplest.
+Since pt-osc synchronizes dual writes within a transaction using triggers, **there is no time lag between the source table and the target table**.
+After the copying of existing data and the copying of incremental data are completed, a direct CutOver can be performed.
+
+```sql
+rename table source_table to tmp_table, target_table to source_table, source_table to target_table;
+```
+
+It can be categorized as an `atomic cutover`. The cutover process is transparent to users (except for some possible latency due to MDL locks).
+
+## facebook-OnlineSchemaChange
+> Code can be found [here](https://github.com/facebookincubator/OnlineSchemaChange/blob/7e661a002d714012b0a5b2311cba24127588e897/core/lib/payload/copy.py#L3181)
+
+Before discussing CutOver, let's provide some background:
+facebook-OnlineSchemaChange uses a delta table to track modifications made to the source table.
+The target table copies incremental data from the source table based on the information in the delta table.
+This means that **the target table will always be slightly behind the source table**.
+
+If the MySQL version is greater than 8.x, the process is as follows:<br />
+1. Lock all tables.
+2. Wait for the incremental data to synchronize, at which point the target table's data will be identical to the source table's.
+3. Perform a table name swap between the Source table and Target table using a single Rename statement.
+
+It can be categorized as an `atomic cutover`.
+
+However, if the MySQL version is below 8.0.13, it's not allowed to execute Rename after Lock Table. Thus, the algorithm degrades to:<br />
+1. Lock all tables.
+2. Wait for the incremental data to synchronize, at which point the target table's data will be identical to the source table's.
+3. Rename the source table to a temporary table name.
+4. (The DDL from the previous step will automatically release the MDL lock, so at this point, user SQL may execute but will return an error because it cannot find the table.)
+5. Rename the target table to the source table's name.
+
+This can be classified as a `puncture cutover`. This means that it involves two separate rename operations, during which the users may experience a noticeable interruption.
