@@ -41,7 +41,7 @@ If the MySQL version is greater than 8.x, the process is as follows:<br />
 
 It can be categorized as an `atomic cutover`.
 
-However, prior to MySQL 8.0.13, executing Rename after Lock Table was not allowed, and it was not supported until WL#9826. As shown in the following figure:
+However, prior to MySQL 8.0.13, executing Rename after Lock Table was not allowed, and it was not supported until [WL#9826](https://dev.mysql.com/worklog/task/?id=9826). As shown in the following figure:
 ![](/assets/onlineddl_cutover/locktable.png)
 So the algorithm would degrade to:<br />
 1. Lock all tables.
@@ -76,3 +76,11 @@ Therefore, we need a mechanism that prevents any DML from being executed between
 * 3.5 Finally, DML operations from steps 2 and 4 are allowed to execute.
 This can be classified as an `atomic cutover`.
 
+## Summary
+The prerequisite for CutOver is that the source and target tables are identical.
+
+For pt-osc, the source and target tables' data are always consistent, so a single rename statement can be used for CutOver directly.
+
+For facebook-osc and gh-ost, the target table is always behind the source table, so they need to stop writes to the source table first and wait for the target table to catch up with the source table before they can proceed with CutOver.
+
+From a functional perspective, pt-osc, facebook-osc (MySQL 8.0.13 and above), and gh-ost can all achieve `atomic cutover`.
