@@ -5,8 +5,6 @@ tags: ['database', 'paper reading', 'distributed system', 'DDL']
 draft: false
 summary: Database schema evolution (DDL) poses unique challenges in ensuring concurrency with transactions while maintaining ACID properties. Traditional approaches use metadata locks (MDLs) to serialize DDL and DML/DQL, but this can severely impact performance. This blog discusses the issues and explores solutions like multi-version concurrency control to enable highly concurrent non-blocking schema changes.
 ---
-
-
 ## 概述
 
 模型演进（schema evolution）是关系型数据库的重要组成部分，在SQL-92标准中提出了一系列用于修改关系模型的语法，也就是各种DDL语句。各个流行的传统数据库都有自己的DDL实现，并且做了相应的优化，但时至今日，数据库的DDL仍然被视为一件危险的事情，只能在运维窗口或者业务低峰期进行。究其原因，在于DDL会阻塞读写事务，对业务会有巨大的潜在影响。 <a name="5Iwh4"></a>
