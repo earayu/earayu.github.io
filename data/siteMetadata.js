@@ -16,7 +16,7 @@ const siteMetadata = {
   twitter: 'https://twitter.com/earayu',
   facebook: '',
   youtube: '',
-  linkedin: '',
+  linkedin: 'https://www.linkedin.com/in/guanghui-yu-6b0784239/',
   locale: 'en-US',
   analytics: {
     // If you want to use an analytics provider you have to add it to the
