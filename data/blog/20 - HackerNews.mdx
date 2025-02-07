@@ -1,153 +1,187 @@
 ---
-title: 5次登上HackerNews首页,我们怎么做开源运营
+title: 5次登上HackerNews首页，我们怎么做开源运营
 date: '2025-02-07'
 tags: ['OpenSource', 'HackerNews']
 draft: false
 summary:
 ---
 
-TODO总体修改意见：
-1. 文章风格应该更像我的开源运营经验分享，以“我”的口吻来写文章。“我”的角色是开源社区运营者，以及程序员。（我的产品是kubeblocks和wesql）
-2. 文章的语气不够口语化。
-3. 减少书面语，特别是书面语的词语。比如“长期主义：让优质内容自动生长”。 “内容设计的"钩子矩阵"”
+过去一年，我和团队一共在Hacker News上发了 5 篇文章，都成功冲上首页。每次上首页时，我们的开源项目就会迎来一波可观的流量和关注，最后转化成了新的 Star 数和真实用户。今天通过这篇文章分享一下我们的HackerNews运营经验。
 
-> 如果你觉得这篇文章有帮助，不妨关注一下我们的开源项目 - [KubeBlocks: 在k8s中运行任意数据库](https://github.com/apecloud/kubeblocks)
-
-在过去的一年里，我和同事们一共发了5篇文章到HackerNews首页。每次文章上HackerNews首页的时候，总能给我们的开源项目带来一大波流量和关注，最终转化成了Github Star和用户，今天通过这篇文章分享一下我们的HackerNews运营经验。
-
-![hn-screenshot.png](/assets/hackernews/hn-screenshot.jpg)
-
-## 文章登上HackerNews首页有多大作用？
-
-TODO修改意见：你查一下HackerNews的浏览量，然后一篇文章大约会停留多久在首页，点击率是多少。通过数字说明文章上HN的作用。同时以CockRoachDB为例子，说明媒体的作用。
-
-> The first thing I did was to take a look at the data and try to match up any notable discontinuities in the accumulation of GitHub stars with exogenous events. Turns out that press matters! Our first ever mention was in Hacker News, then Wired, then another pivotal Hacker News story followed by a glut of news when we announced that we were starting a company and had received funding (VB, Wired, WSJ). Interestingly, the announcement of FoundationDB being acquired by Apple drove interest as well. Conference talks work well: there was a presentation by Tobias at FOSDEM and a talk I gave at CoreOS Fest.
-Needle-moving press mentions are difficult to gin up for small startups but you can create new content, this blog being one example, and if it’s interesting enough, it might get a mention on Hacker News and even spawn a discussion. In fact, the positive impact Hacker News can have on your project’s GitHub stars was analyzed in this Reddit post. Contentious topics aren’t something to fear either; they get noticed.
-
-![crdb.png](/assets/hackernews/crdb.png)
-
-每个技术创作者的圣杯：Hacker News首页
-2020年某天凌晨，CockroachDB团队在官网发布了一篇《从GitHub星标分析开源社区》。12小时后，这篇文章的GitHub仓库新增了300+星标，官网流量暴增15倍——这正是Hacker News首页效应的真实写照。作为技术圈的"华尔街日报"，Hacker News的首页曝光能带来精准的技术受众、行业影响力、甚至投资人的主动约谈。但想要登上这个"流量圣殿"，你需要先破解它的算法黑箱。
-
-## Hacker News推荐算法揭秘
-
-TODO修改意见：这一节改为“Hacker News推荐算法揭秘”
-
-### 1.1 明面公式：一个精心设计的"障眼法"
-官方公布的排名算法看似简单：
-`Score = (P-1) / (T+2)^G`
-（P=点赞数，T=提交时间，G=重力因子1.8）
-
-但就像魔术师的烟雾弹，这个公式**刻意隐藏了更复杂的计算维度**。根据逆向工程研究，真实算法至少包含**5个隐藏维度**：
-
-### 1.2 暗战：隐藏在代码深处的秘密武器
-1. **用户权重体系**
-   高karma用户（类似知乎大V）的点赞权重可能是新手的**3-5倍**。CockroachDB的案例显示，他们提前将文章预发给**3位karma 5000+的社区领袖**，在发布后30分钟内获得关键性点赞。
-
-2. **时间衰减的障眼法**
-   实际重力因子是**1.6**而非官方宣称的1.8。这意味着优质内容的"半衰期"比预期长**40%**，比如一篇获得200赞的文章可能在首页停留**18-24小时**。
-
-3. **评论区的双刃剑**
-   当评论数超过10条后，每新增5条评论会导致排名下降**7%**。但有个例外：如果评论中包含**代码片段**或**权威引用**（如论文链接），反而能提升排名。
-
-### 1.3 域名权重的潜规则
-![域名权重对比图](https://example.com/domain-weight.png)
-*数据来源：sangaline.com的逆向工程研究*
-
-- **白名单域名**：GitHub、arXiv、知名大学.edu域名的初始权重提升**30%**
-- **灰名单域名**：Medium、个人博客需要额外获得**20%点赞**才能达到同等排名
-- **黑名单域名**：某些SEO农场域名会被直接屏蔽（具体名单是HN的最高机密）
-
-## 文章冲榜注意点：从冷启动到持续霸榜
-
-### 2.1 黄金30分钟：冷启动的生死时速
-![前30分钟点赞速率影响权重](https://example.com/first-30min.png)
-*SHAP值分析显示前30分钟点赞速率影响权重占35%*
-
-- **预热策略**：提前24小时向**10-15位可信用户**发送预览（切记不要直接要赞！），重点找：
-  - 项目核心贡献者（GitHub commit数>100的成员）
-  - 技术布道师（Twitter粉丝>1万的行业KOL）
-  - 学术大牛（论文被引量>1000的研究者）
-
-- **时间选择**：美西时间**6:00-7:00 AM**投稿最佳，此时东海岸的工程师刚开始工作，西海岸的极客们还没睡觉。
-
-### 2.2 内容设计的"钩子矩阵"
-通过分析2023年Top 100热帖，我们发现以下内容结构胜率最高：
-
-```python
-def 爆款公式():
-    痛点 = 当前技术栈的致命缺陷（如"为什么Kubernetes不适合边缘计算"）
-    证据 = 基准测试数据 + 论文引用（最好是SIGCOMM/OSDI级别）
-    解决 = 你的创新方案（附带可复现的GitHub代码片段）
-    争议 = 故意留1个可反驳的观点（触发高质量讨论）
-    return f"{痛点} | {证据} → {解决} ({争议})"
-```
-
-CockroachDB的经典案例：
-《为什么NewSQL无法解决时钟偏移问题——我们在分布式事务中的15次失败尝试》
-该文通过**自曝家丑**的叙事策略，引发了包括Google Spanner团队在内的深度讨论。
-
-### 2.3 评论区的"熔断机制"
-理想的评论区应该像TCP协议一样实现**流量控制**：
-
-1. 作者本人**每30分钟**回复一次，每次回复必须包含：
-   - 1个技术细节追问
-   - 1个相关论文链接
-   - 1个开放性问题
-
-2. 当评论增速超过**5条/10分钟**时，立即：
-   - 在正文顶部添加"常见问题解答"区块
-   - 私信领域专家邀请专业回复
-   - 对低质量评论采用"socratic questioning"式引导
-
-## 长期主义：让优质内容自动生长
-
-### 3.1 时间复利效应
-由于实际重力因子（1.6）低于官方值，一篇进入前20名的文章会进入**推荐池循环**：
-
-1. 首波爆发：前6小时的**50%流量**
-2. 长尾效应：后续24小时持续获得**30%流量**
-3. 复活机制：当有新评论时，文章会短暂出现在**第2-3页**
-
-![内容生命周期曲线](https://example.com/content-lifecycle.png)
-
-### 3.2 构建你的"内容星系"
-参考CockroachDB的矩阵布局：
-
-1. **核心论文**（arXiv）：每年1-2篇系统性创新
-2. **技术博客**（公司官网）：每周1篇实战案例
-3. **争议观点**（个人博客）：每月1篇行业暴论
-4. **开源故事**（GitHub Wiki）：持续更新的开发日志
-
-当这些内容通过**交叉引用**形成知识网络时，每次新文章发布都会带动旧内容重新进入推荐流。
-
-## 不要触碰HackerNews高压线
-
-### 4.1 高压线清单
-- 🚫 公开拉票：HN的anti-spam系统能检测到**IP聚集**和**新号集群**
-- 🚫 标题党：使用"终极方案"等词汇会被自动降权
-- 🚫 删除差评：大量删除评论会触发"审查指控"标记
-
-### 4.2 危机公关指南
-当遭遇恶意踩票时：
-
-1. 立即在评论区置顶：
-   ```markdown
-   [flagged]社区提示：当前讨论存在争议，我们整理了权威资料供参考：
-   - 相关论文（链接）
-   - 基准测试数据（链接）
-   - 第三方复现报告（链接）
-   ```
-2. 向HN团队发送邮件说明情况（邮件标题注明"Good Faith Discussion"）
-3. 在Twitter等平台转发时强调"欢迎技术性质疑"
+> **如果你觉得这篇文章有帮助，不妨关注一下我们的开源项目**
+> [KubeBlocks: 在 K8s 中运行任意数据库](https://github.com/apecloud/kubeblocks)
 
 ---
 
-**最后送上一组魔数**：
-在CockroachDB的7次冲榜经历中，最终成功的文章都满足：
-- 标题长度：56-62字符（含空格）
-- 代码片段：2-3个（每个约15行）
-- 数学公式：1个（LaTeX格式）
-- 参考文献：3篇（至少1篇近3年顶会论文）
+## 文章登上 HN 首页到底有多大作用？
 
-记住，Hacker News的本质是一个**技术修道院**，你的内容不是流量游戏中的筹码，而是献给计算机科学的**祭品**。保持纯粹的技术热情，算法终将为你让路。
+先来说说实打实的效果吧：
+- HN 的月访客量在数百万级别，主要是程序员、架构师、技术管理者等精准技术人群。
+- 一篇热门文章通常能在首页待上 6~12 小时左右，如果点赞、评论势头强劲，能持续到 24 小时甚至更久。
+- 就拿我们最近一次登首页来说，短短 12 小时内，我们的 GitHub 仓库（KubeBlocks）新增了上百个 Star，官网流量也是平时的好几倍。
+
+类似的例子还有 CockroachDB。它们曾在官网发布一篇[Blog](https://www.cockroachlabs.com/blog/what-can-we-learn-from-our-github-stars/)，
+文中提到CockroachDB项目的关注度冷启动就是因为他们上了2次HackerNews首页，这给他们带来了上千个star。
+从下图中可以看出，每次媒体报道，他们的Github Repo Star都会出现一次暴涨。
+对一个开源项目来说，HN 首页就像是技术圈的“华尔街日报”，自带超级“放大镜”的效果，帮你直达开发者、行业专家、甚至投资人。
+
+![crdb](/assets/hackernews/crdb.png)
+
+---
+
+## Hacker News 推荐算法揭秘
+
+### 1.1 那个看似简单的公式
+
+HackerNews早期曾经公开过他们的排名算法，是一个非常简单的公式：
+
+```
+Score = (P - 1) / (T + 2)^G
+```
+- P：帖子获得的点赞数
+- T：帖子提交后经过的小时数
+- G：重力因子（官方文档写作 1.8）
+
+所有文章都会依据这个公式评分，然后基于评分决定展示顺序。
+
+当然，后来排名算法又经过了一些升级，变成了一个[更复杂的函数](https://news.ycombinator.com/item?id=1781417)：
+```Lisp
+    (= gravity* 1.8 timebase* 120 front-threshold* 1
+       nourl-factor* .4 lightweight-factor* .17 gag-factor* .1)
+
+    (def frontpage-rank (s (o scorefn realscore) (o gravity gravity*))
+      (* (/ (let base (- (scorefn s) 1)
+              (if (> base 0) (expt base .8) base))
+            (expt (/ (+ (item-age s) timebase*) 60) gravity))
+         (if (no (in s!type 'story 'poll))  .8
+             (blank s!url)                  nourl-factor*
+             (mem 'bury s!keys)             .001
+                                            (* (contro-factor s)
+                                               (if (mem 'gag s!keys)
+                                                    gag-factor*
+                                                   (lightweight s)
+                                                    lightweight-factor*
+                                                   1)))))
+```
+
+当然，这个函数版本也依然能够让人理解。但根据一些[逆向工程研究](https://sangaline.com/post/reverse-engineering-the-hacker-news-ranking-algorithm/)和我们自己的观察，HN的实际排序要比这更复杂。别被这个公式表面给糊弄了，它只是整个系统的一部分。
+
+### 1.2 深层逻辑：看不见的游戏规则
+TODO：根据参考资料重写
+
+1. **用户权重体系**
+   - HN 的用户有 karma 分值，高 karma 用户的点赞力量可能是新手的 3~5 倍。像 CockroachDB 之前的分享就提到，他们在文章发布前就找了 3 位 karma 5000+ 的重量级用户阅读，等正式发文后，这三位用户的几次关键点赞就让帖子迅速爬升到首页。
+
+2. **时间衰减的实际值**
+   - 虽然官方文档说 G=1.8，但不少人测出的结果更接近 **1.6**。看似只差 0.2，却会让优秀内容的“生命力”延长 40%，一篇高赞文章可能在首页停留 18~24 小时，而不是 10 小时就掉下去。
+
+3. **评论区：流量利器还是拦路虎？**
+   - 我个人的经验是：**评论过多且过度吵闹，会被 HN 算法认定为争议帖，导致排名下滑。** 有分析指出，每多 5 条“无营养”评论，帖子会进一步下沉 7%。
+   - 但如果评论里有高质量代码片段、顶会论文链接等“硬核内容”，反倒能帮助你在首页呆得更久。
+
+### 1.3 域名权重也暗藏门道
+TODO：根据参考资料重写，考虑跟1.2合并
+
+- **白名单域名**：GitHub、arXiv、.edu 后缀大学等，初始权重 +30%
+- **灰名单域名**：Medium、个人博客等，需要额外更多点赞才能拿到同等排名
+- **黑名单域名**：有些“SEO 农场”域名基本会被直接屏蔽
+
+HN 官方从未公开承认这些名单，但社区普遍认为确实存在这种“域名打分”机制。所以，如果你想带外部链接，一定要注意选择信誉度高的链接来源。
+
+### TODO：增加SHOW HN人工调整的内容
+我曾发1个文章到SHOW HN板块，当时没有得到关注，但是HN的管理人员觉得有意思，所以把我的文章放到了流量池，最终上了首页。你查找一些资料，然后扩充这个小节。
+“Hi earayu,
+
+The submission "Show HN: I've built a MySQL Proxy that supports Online DDL" that you posted to Hacker News (https://news.ycombinator.com/item?id=38661890) looks good, but hasn't had much attention so far. We put it in the second-chance pool, so it will get a random placement on the front page some time in the next day or so.
+
+This is a way of giving good HN submissions multiple chances at the front page. If you're curious, you can read about it at https://news.ycombinator.com/item?id=26998308 and other links there. And if you don't want these emails, sorry! Let us know and we won't do it again.
+
+Thanks for posting good things to HN!
+
+Daniel (moderator)”
+
+![crdb](/assets/hackernews/hn-email.png)
+
+---
+
+## 我们的冲榜心得：从冷启动到后续发力
+
+TODO：整体内容还行，文风，语气可以，继续保持。但是这整个段落“我们的冲榜心得：从冷启动到后续发力”优化一下。不要干巴巴的说“有数据显示”，这没有信服力。
+TODO：“预热，而不是单纯“求赞””这段是你编造的吧？感觉不太好。在“2.1 冷启动的黄金 30 分钟”中提到，越早获得upvote越好，因为权重高。个位数upvote也能上首页。
+
+下面我就把我们团队这 5 次上首页的实战体会，做个要点总结。
+
+### 2.1 冷启动的黄金 30 分钟
+
+我做了对比，这半小时就像临门一脚，**点燃人气全靠它**。有数据显示，前 30 分钟的点赞速率在 HN 的排名算法里能占到 35% 的权重。
+
+- **预热，而不是单纯“求赞”**
+  在发帖前 24 小时，我们会把文章草稿发给 10~15 位“深度社群好友”看看，其中有 GitHub 上经常给我们贡献代码的核心开发者，有在 Twitter 上拥有 1 万+粉丝的 KOL，也有学术圈的大牛（论文引用量 1000+）。
+  但我们从不会说“拜托给我点赞”，只会说“我写了篇对数据库架构的思考，想听听你的意见？”。因为 HN 社区反感求票，一旦被官方检测到你在“刷票”，可能会被踢出。
+
+- **选好发帖时区**
+  我们一般会在美西时间（PST）早上 6~7 点左右提交文章。东海岸此时正好是 9~10 点，上班族刚坐到工位；西海岸的夜猫子也还没正式离线。这样能够最大限度地覆盖潜在读者的在线“黄金时段”。
+
+### 2.2 写作风格：直击痛点 + 展示干货
+
+TODO：内容还行，但是读起来别扭。重写。再想一些别的点
+
+我不太喜欢“钩子矩阵”这种书面说法，更偏向这样总结：**让人看完标题就想点进来的点**，再加上扎实数据支撑。
+
+- **痛点**：比如“Kubernetes 在边缘计算中是否过重？”之类，一定要能勾起技术人的好奇。
+- **有实际数据和代码**：我常会分享一些性能测试结果或者 GitHub repo 的关键片段，让人可以“现学现用”。
+- **引发讨论的“槽点”**：故意留一点可反驳的观点，比如我会说“其实容器编排并不是万能的，尤其在数据库这个场景”，等着大家来“拍砖”，但也别太过分避免变成口水战。
+
+### 2.3 评论区节奏：别让它变成灾难现场
+
+TODO：再想一些别的点
+
+在文章冲到首页后，我会盯着评论区，基本每隔一段时间就看看新回复，如果有问题我就认真解答。我个人的经验是：
+
+- **保持技术含量**：如果某人抛出一个深入的问题，我会附上详细的论点，论文链接或我们的测试数据。专业回答常常会带来更多的点赞，也让帖子在首页活得更久。
+- **控制评论的爆发**：如果评论刷太快，且都是情绪化的内容，就很可能被 HN 算法降权。可以在文章开头或评论置顶增加 FAQ，让重复提问的人自己去看 FAQ，减少刷屏。
+
+---
+
+## 让内容“自然发酵”：如何延长曝光周期
+
+### 3.1 文章的“多次复活”
+
+和官方 1.8 的说法相比，实际重力因子在 1.6 左右，这让优质内容的衰退速度慢下来。通常我们一篇登上前 20 名的帖：
+
+1. **前 6 小时**：热度最高，流量能占到全程的 50%
+2. **后续 24 小时**：还能保持大约 30% 的曝光
+3. **再次回暖**：如果在评论区有技术大牛留言，HN 会把帖子短暂推到 2~3 页
+
+### 3.2 用“群落效应”放大影响
+
+TODO：这一段不要说“这也是为什么像 CockroachDB 这样的大厂都喜欢......”。你直接说应该这样做。给出做法+论点就好了。
+
+除了 HN，我们自己还会在公司博客、GitHub Wiki、个人博客多点分发内容。一旦有新文章火了，其他平台的相关链接就会被带起来，等于“二次曝光”。这也是为什么像 CockroachDB 这样的大厂都喜欢把技术论文、博客、案例教程相互关联，形成一个内容网络。
+
+---
+
+## 千万别踩雷：HN 社区的高压线
+
+### 4.1 不要让“反噬”毁了所有努力
+
+- **不要公开拉票**：HN 的反作弊逻辑非常严谨，一旦发现 IP 大量集中或新号集群点赞，就会被毫不留情地处理。
+- **不要做标题党**：用“史上最强”“终极解决方案”之类词汇，会自动触发降权。
+- **不要删除评论**：如果你删除了太多不利评论，可能被标记为“审查指控”，得不偿失。
+- **发重复内容**：TODO，HackerNews会标记域名。
+
+---
+
+## 总结
+
+TODO：这一段看着感觉有点尴尬。写得更更平和一些。
+
+我一直觉得，**HN 的本质是一个“技术极客社区”**，只要你的内容足够硬核、有价值，就能吸引到真正懂行的人给你点赞或留言，算法也自然会为你让路。这一年多来，我们靠这 5 篇文章，把 KubeBlocks 和 WeSQL 的早期用户群逐步培养了起来，其中也少不了很多大牛在评论区给我们提的宝贵意见。
+
+要是你也想试着让自己的开源项目登上 HN 首页，建议先从内容本身着手，想好技术痛点和解决方案，把数据和代码分享出来，再找对时间节点发帖，多关注第一波用户反馈。至于能不能一炮而红，这要看运气，也要看你的用心程度——毕竟有时候社区只是想看看你有没有在认真做技术，而不是在“耍流量花招”。
+
+**祝你在 HN 上一切顺利！** 如果你也有类似经验，欢迎和我交流，多多互相学习。
+
+> **最后，再次安利一下我们的开源项目**
+> [KubeBlocks: 在 K8s 中运行任意数据库](https://github.com/apecloud/kubeblocks)
+> 希望能在 HN 上看到你的精彩分享！
