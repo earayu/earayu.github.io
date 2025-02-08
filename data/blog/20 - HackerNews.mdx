@@ -1,50 +1,51 @@
 ---
-title: 5次登上HackerNews首页，我们怎么做开源运营
+title: What We Learned from 5 HackerNews Front Page Hits: A Guide to Open Source Growth
 date: '2025-02-07'
 tags: ['OpenSource', 'HackerNews']
 draft: false
 summary:
 ---
 
-在过去的一年里，我和同事们一共发了5篇文章到HackerNews首页。每次文章上HackerNews首页的时候，总能给我们的开源项目带来一大波流量和关注，最终转化成了Github Star和用户，今天通过这篇文章分享一下我们的HackerNews运营经验。
+Over the past year, my colleagues and I have posted five articles that reached the Hacker News front page. Each time one of our articles hit the HN front page, it generated a wave of traffic and attention for our open source project, which ultimately translated into GitHub stars and users. In this post, I’d like to share some of our Hacker News “growth hacking” experiences.
 
-> 如果你觉得这篇文章有帮助，不妨关注一下我们的开源项目
-> [KubeBlocks: 在 K8s 中运行任意数据库](https://github.com/apecloud/kubeblocks)
-
----
-
-## 文章登上 HN 首页到底有多大作用？
-
-先来说说实打实的效果吧：
-- HN 的月访客量在数百万级别，主要是程序员、架构师、技术管理者等精准技术人群。
-- 一篇热门文章通常能在首页待上 6~12 小时左右，如果点赞、评论势头强劲，能持续到 24 小时甚至更久。
-- 就拿我们最近一次登首页来说，短短 12 小时内，我们的 GitHub 仓库新增了上百个 Star，官网流量也是平时的好几倍。
-
-类似的例子还有 CockroachDB。它们曾在官网发布一篇[Blog](https://www.cockroachlabs.com/blog/what-can-we-learn-from-our-github-stars/)，
-文中提到CockroachDB项目的关注度冷启动就是因为他们上了2次HackerNews首页，这给他们带来了上千个star。
-从下图中可以看出，每次媒体报道，他们的Github Repo Star都会出现一次暴涨。
-对一个开源项目来说，HN 首页就像是技术圈的“华尔街日报”，自带超级“放大镜”的效果，帮你直达开发者、行业专家、甚至投资人。
-
-![crdb](/assets/hackernews/crdb.png)
+> If you find this article helpful, feel free to check out our open source project:
+> [KubeBlocks: Run Any Database on Kubernetes](https://github.com/apecloud/kubeblocks)
 
 ---
 
-## Hacker News 推荐算法揭秘
+## How Much Impact Does the HN Front Page Really Have?
 
-### 那个看似简单的公式
+Let’s start with some tangible results:
 
-HackerNews早期曾经公开过他们的排名算法，是一个非常简单的公式：
+- HN (Hacker News) receives millions of monthly visits, primarily from developers, architects, and technical leaders.
+- A popular post can stay on the front page for 6–12 hours, and if it continues to get upvotes/comments, it can last up to 24 hours or even longer.
+- For our most recent front-page post, within just 12 hours, our GitHub repository gained over a hundred new stars, and our website traffic soared to several times its usual level.
+
+There’s a well-known example from CockroachDB. In a [blog post](https://www.cockroachlabs.com/blog/what-can-we-learn-from-our-github-stars/) on their official site, they mentioned that early attention for their project took off after appearing on the Hacker News front page twice, bringing in thousands of GitHub stars. You can see in the chart below that every media mention triggered a noticeable spike in their GitHub repo stars.
+
+For an open source project, HN is like the “Wall Street Journal” of the tech world. It comes with a massive “magnifying effect,” connecting you directly to developers, industry experts, and sometimes even investors.
+
+![CockroachDB Star Spikes](/assets/hackernews/crdb.png)
+
+---
+
+## Demystifying the Hacker News Ranking Algorithm
+
+### The Original Seemingly Simple Formula
+
+In its early days, Hacker News publicly shared a straightforward ranking formula:
 ```
 Score = (P - 1) / (T + 2)^G
 ```
-- P：帖子获得的点赞（upvote）数
-- T：发帖后过去的小时数
-- G：重力因子，官方文档说是1.8
+where:
+- **P** is the number of upvotes
+- **T** is the number of hours since submission
+- **G** is the gravity factor, which the official docs say is 1.8
 
-所有文章都会依据这个公式评分，然后基于评分决定展示顺序。
+All posts are scored according to this formula, and their positions are determined accordingly.
 
-后来排名算法又经过了一些升级，变成了一个[更复杂的函数](https://news.ycombinator.com/item?id=1781417)：
-```Lisp
+Later on, the algorithm was updated into a [more complex function](https://news.ycombinator.com/item?id=1781417):
+```lisp
 (= gravity* 1.8 timebase* 120 front-threshold* 1
    nourl-factor* .4 lightweight-factor* .17 gag-factor* .1)
 
@@ -63,90 +64,88 @@ Score = (P - 1) / (T + 2)^G
                                                1)))))
 ```
 
-当然，这个函数版本也依然能够让人理解。但根据一些[逆向工程研究](https://sangaline.com/post/reverse-engineering-the-hacker-news-ranking-algorithm/)和我们自己的观察，HN的实际排序要比这更复杂，它只是整个系统的一部分。
+Although still somewhat readable, this function is just part of the system. Based on various [reverse engineering analyses](https://sangaline.com/post/reverse-engineering-the-hacker-news-ranking-algorithm/) and our own observations, the actual ranking involves more complexity.
 
-**域名打分：**
-- GitHub、arXiv、大学 .edu 后缀等往往被认为是“白名单”，初始权重更高；
-- 像 Medium、个人独立博客就处在灰色地带，需要更多点赞才能上去；
-- 某些“SEO 垃圾站”域名则可能直接被屏蔽。
+#### Domain Scoring
+- Well-trusted domains like GitHub, arXiv, and university `.edu` sites often have higher initial weight.
+- Medium or personal blogs are in a “gray zone,” requiring more upvotes to rank.
+- Certain “SEO spam sites” may be blocked entirely.
 
-因此，如果你要贴链接，最好选“信誉”更高的域名，或直接在 GitHub 提供原文。
+If you need to share an external link, pick a reputable domain—or post your original text on GitHub to get that credibility boost.
 
-**评论数是否会“反噬”：**
+#### Do Comments Hurt or Help Your Rank?
 
-一篇文章如果在短时间内出现大量吵闹型评论，极可能被算法判定为“争议帖”，排名迅速下滑。
-但如果评论区产出了真正有价值的技术讨论或资料分享（比如源码片段、高质量论文链接），反而能拉长帖子在首页的停留时间。
+If a post racks up lots of noisy or argumentative comments in a short time, it could be flagged as “controversial” and sink in the rankings. But if the comments are high-quality, with valuable technical discussion or shared resources (e.g., code snippets, academic references), it can actually extend a post’s time on the front page.
 
+#### The Myth of “Weighted Votes”
 
-**投票权重：**
-
-不少人以为“高 karma 用户的点赞会让帖子更快上首页”，但根据 [HN 官方 FAQ](https://news.ycombinator.com/newsfaq.html) 的说法，更高的 karma 并不会让你的发帖排名更高。所以至少从官方口径来看，HN 对帖子排序并没有直接把“用户 karma 高低”作为加权因素。
-不过，社区里也有种说法：活跃的大牛账号往往自带“圈子关注度”，他们的发文更容易被别人看到和讨论，可能因此带来更多后续 upvote。但这并不代表算法在技术上给高 karma 账户赋予了额外权重，而更像是一种“社群效应”在起作用。
+Some believe “upvotes from high-karma users push posts up faster,” but according to the official [HN FAQ](https://news.ycombinator.com/newsfaq.html), a user’s karma doesn’t directly give their vote more weight. Still, community “big names” with high karma do attract attention, so if they post or comment, more people tend to see it. This effect is more social than algorithmic.
 
 ---
 
-## HackerNews冲榜心得：从冷启动到后续发力
+## From Cold Start to Growth: HN Front-Page Strategies
 
-### 冷启动的关键：前 30 分钟
+### The First 30 Minutes: A Crucial Window
 
-HN 的排序算法非常注重早期点赞速度。有逆向分析的帖子指出，“前 30 分钟的点赞速率”对最终能否登首页的影响权重可达 35%。**前30分钟哪怕只有个位数点赞，也能把帖子迅速顶起来**。比如这篇，3个upvote就上了首页。
+The HN ranking algorithm heavily emphasizes upvote velocity in the early phase. Some reverse-engineering posts suggest that upvote speed in the **first 30 minutes** can influence as much as 35% of whether you reach the front page. Even a handful of upvotes in that window can catapult a submission upward.
 
-![crdb](/assets/hackernews/github-actions.png)
+For instance, here’s a post with just three upvotes that still made it onto the front page:
 
-**发帖时间选择**
-我们通常选在美西早上6-7点（PST）左右提交文章。因为美东此时已是上班时间9-10点，夜猫子的西海岸程序员则可能还没彻底离线。这样能最大化覆盖北美开发者的黄金活跃时段。
+![HN Post Example](/assets/hackernews/github-actions.png)
 
-### “Show HN”板块的人肉加权
+**Choosing the Right Time to Post**
+We usually post around 6–7 AM PST. By then, it’s 9–10 AM on the East Coast, and night-owl developers on the West Coast might still be online. This covers a broad swath of the North American developer community’s peak activity hours.
 
-HN 里有一个很有意思的频道叫 **Show HN**，用来展示你做的项目或新工具。我曾经发过一篇《Show HN: I've built a MySQL Proxy that supports Online DDL》，最开始没引起任何流量，后来意外收到 HN 管理员发来的邮件，说他们把我的帖子放进了一个“二次推荐池”，会随机再推到首页一把。果然，隔天帖子真的被推到首页，获得了大量关注。
+### The “Show HN” Channel: A Human-Curated Boost
 
-![crdb](/assets/hackernews/hn-email.png)
+Hacker News has a special section called **Show HN**, designed for showcasing your own projects or tools. I once posted “Show HN: I’ve built a MySQL Proxy that supports Online DDL.” At first, it gained no traction. Then, out of the blue, I received an email from an HN admin saying they would give it another push from the “second-chance pool.” Sure enough, the next day it appeared on the front page and racked up a ton of attention.
 
-所以如果你自认有好作品想展示，“Show HN”渠道更值得一试。有时哪怕首轮没人看，依然可能靠官方“第二次机会”给你翻盘。
+![HN Email Notice](/assets/hackernews/hn-email.png)
 
-### 评论区的节奏：别让好内容毁在“吵架”上
+So if you have a project you’re proud of, definitely try “Show HN.” Sometimes, even if it doesn’t catch on initially, an official “second chance” can turn things around.
 
-帖子上首页之后，评论区往往会热闹起来。这时候有几点非常关键：
+### Managing the Comments: Don’t Let Good Content Get Derailed
 
-- **保持技术含量：** 如果有人抛出更深入的问题，就认真回答，附上数据、论文或repo地址。这样会让更多人觉得“这篇帖子有看头”，自然愿意点赞，也帮助帖子维持高排名。
-- **控制水贴、争议贴：** HN 的算法会检测“争吵”或“重复无营养回复”，一旦过多就会判断帖子有争议而下调排序。我们一般会在正文或评论置顶处放 FAQ，减少同类问题反复刷屏。
+Once you’re on the front page, the comment section can get very lively. A few pointers:
 
-### 如何延长曝光周期？——“自然发酵”策略
+- **Maintain Technical Depth:** If people ask deeper questions, answer thoughtfully. Provide data, papers, or links to repos. This signals real substance and can encourage more upvotes and longer front-page visibility.
+- **Curb Redundant or Heated Threads:** HN’s algorithm detects flame wars or repeated “low-value” comments. If they pile up, your post might drop in rank. We usually prepare an FAQ in the post or in a top comment to preempt repeated questions.
 
-理论上，HN 有一个“重力因子”(gravity=1.8)让老帖会随时间加速下沉。可实际上，很多逆向工程研究认为，这个重力因子大约是 1.6，比官方标称值小一点点，意味着优秀帖子会掉得没那么快。我们常见的情况是：
+### Extending Exposure: “Natural Fermentation”
 
-- **前 6 小时：** 热度最猛，大概能收获 50% 的总流量。
-- **之后 12～24 小时：** 如果评论质量持续在线，一些技术大牛进来回复，你还能再维持 30% 的曝光度。
-- **评论区再触发“返场”：** 当有新的优质评论出现，HN 会给帖子“二次浮现”的机会，把它短暂推到第二或第三页，带来额外流量。
+In theory, the HN “gravity” factor (officially ~1.8) ensures older posts drop fast. But some research suggests actual gravity might be closer to 1.6, so high-quality posts don’t sink as quickly. Here’s the typical pattern we see:
 
-### 多平台联动，放大“群落效应”
+- **First 6 hours:** Peak traffic, about 50% of the total exposure.
+- **Next 12–24 hours:** If high-quality discussion continues—especially if notable contributors join—you might retain ~30% of your visibility.
+- **Comment-Driven “Second Wind”:** When new valuable comments appear, HN can briefly resurface the post on the second or third page, adding more traffic.
 
-不断产出优质内容，并且内容之间互相关联。比如 CockroachDB 会在官方博客、GitHub Wiki、社区技术分享等各处同步信息，彼此互链，一旦其中一篇爆了，就能带动整个项目生态一起受益。
+### Multi-Platform Synergy: Amplifying the “Community Effect”
 
-当你在 HN 上火了，别忘记把文章同步更新到你的公司博客、个人博客、X、GitHub Wiki 等“自留地”，并在彼此间互相链接。这样做有两个好处：
-1. **让对你有兴趣的人能迅速获取更多延伸内容**，提高转化；
-2. **形成一个持续引流的内容网络**，哪怕 HN 那边热度降了，其他平台依旧能接力“发酵”。
+Keep producing quality content and link it across multiple platforms. CockroachDB, for example, cross-posts to their official blog, GitHub Wiki, and community shares, linking them together. If one article takes off, it brings traffic to all related content.
 
-
----
-
-## 千万别踩雷：HN 社区的高压线
-
-HN 社区氛围很纯粹，如果你试图用“标题党”或“求票”套路它，就很容易被识破。以下几条最好谨记：
-
-1. **不要公开拉票**：HN 对此零容忍。侦测到大量新号集中的刷票，会立刻屏蔽。把你的HN链接发给别人投票是无效的。需要读者从HackerNews页面自己进入才是有效的。
-2. **拒绝标题党**：用“史上最强”, “终极解决方案”此类词汇，会被用户和系统一起抵制。
-3. **别大面积删除评论**：要是你在帖子里疯狂删评论，极有可能被标记“审查嫌疑”，得不偿失。
-4. **避免频繁发重复域名**：如果你不断使用同一个域名发帖，可能被系统视为 spam。
+When you go viral on HN, don’t forget to update your company blog, personal blog, X (formerly Twitter), GitHub Wiki, etc., and link them back and forth. This has two advantages:
+1. **Readers who discover you on HN can quickly find more in-depth content**, boosting conversions.
+2. **You build a persistent content network**—even after HN buzz fades, other channels keep the momentum going.
 
 ---
 
-## 6. 总结
+## Avoiding Pitfalls: HN’s “Taboos”
 
-HN 本质是一个由极客和技术人组成的社区，只要你真正在做“硬货”，并且能写出能引发技术讨论的文章，它就可能把你推到更多用户面前。我们这一年靠 5 篇发文，让 KubeBlocks 这样的开源项目快速冷启动，还收获了不少一线开发者的反馈和建议。
+The Hacker News community has a very “pure” culture. Any “clickbait” or blatant promotional tactics are usually spotted and penalized. Keep these in mind:
 
-当然，想冲上首页也离不开运气成分——有时要看你发布文章的时间点、当时同台竞争的帖子质量等等。但你能做的，就是确保内容扎实、选好时区、留意前 30 分钟的“点赞节奏”，以及在评论区用心维护讨论氛围。只要路数对了，被“二次推荐”或者长期在首页露面的机会也会更多。
+1. **Never Ask for Upvotes:** HN has zero tolerance for vote manipulation. If it detects suspicious upvoting from new accounts, it blocks them. You need people to find your post organically on HN and upvote from the HN page itself.
+2. **Beware of Clickbait:** Overblown titles like “the ultimate solution” or “the best ever” can be downvoted by users and suppressed by the system.
+3. **Don’t Mass-Delete Comments:** If you repeatedly remove comments you don’t like, the system may flag your post for “censorship.” It’s not worth it.
+4. **Limit Repetitive Domain Posts:** Submitting content from the same domain over and over might be labeled as spam by the algorithm.
 
-最后，再次安利我们的开源项目 [KubeBlocks](https://github.com/apecloud/kubeblocks)，如果有兴趣，欢迎你来试用、提 Issue 或给我们点个 Star，也期待能在 HN 上看到你大放异彩的作品！
+---
 
-**祝大家都能在 HN 玩得顺风顺水，收获更多开源世界的惊喜！**
+## Conclusion
+
+At its core, Hacker News is a community of tech enthusiasts and geeks. If you’re genuinely building something substantial and can write articles that spark technical discussions, HN can help you reach a broader audience. Over the past year, we rode five posts to the front page, which gave our open source project, [KubeBlocks](https://github.com/apecloud/kubeblocks), a swift kickstart, along with direct feedback from developers in the trenches.
+
+That said, luck does play a role—timing, competing posts, and other variables all matter. But you can maximize your chances by publishing solid content, choosing the right time zone, paying attention to that critical first 30 minutes, and fostering a positive discussion in the comments. If things go well, you may get that “second boost” and even stay on the front page longer than expected.
+
+Finally, I’d like to invite you again to check out our open source project, [KubeBlocks](https://github.com/apecloud/kubeblocks). If it sparks your interest, feel free to give it a try, open an issue, or drop us a star. And I look forward to seeing your own creations thrive on HN!
+
+**Wishing everyone smooth sailing on HN and plenty of exciting discoveries in the open source world!**
